@@ -1,0 +1,10 @@
+# Finder configuration
+.DS_Store
+
+# IDE Configuration
+.vscode/
+conf.sh
+
+# Unix executables
+*.out
+
