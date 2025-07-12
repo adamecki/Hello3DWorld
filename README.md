@@ -22,5 +22,5 @@ g++ -I include -L lib -g main.cpp glad.c shader.cpp -o main.out -l glfw3 -l GL -
 ```
 
 ### Other information
-At the moment the program renders a rectangle. You can control its bottom left vertex' X and Y position using the arrow keys. 0 key exits the program.
-
+At the moment the program renders two triangles next to each other using different fragment shaders.
+Hitting the '0' key exits the program.
