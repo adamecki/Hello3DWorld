@@ -3,24 +3,32 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+// [DONE] Objective 1: Draw 2 triangles next to each other using glDrawArrays by adding more vertices to your data.
+// [DONE] Objective 2: Create the same 2 triangles using two different VAOs and VBOs for their data.
+// [DONE] Objective 3: Create two shader programs where the second program uses a different fragment shader
+//              that outputs the color yellow; draw both triangles again where one outputs the color yellow.
+
 // window settings
 const unsigned int WINDOW_W = 1024;
 const unsigned int WINDOW_H = 768;
 
-// "Hello Triangle" chapter - polygon vertices
-float vertices[] = {
-     0.5f,  0.5f, 0.0f,
-     0.5f, -0.5f, 0.0f,
-    -0.5f, -0.5f, 0.0f,
-    -0.5f,  0.5f, 0.0f
+// "Hello Triangle" chapter - triangle vertices
+float vertices_1[] = {
+    // First triangle
+    -0.75f, -0.25f, 0.0f,
+    -0.25f, -0.25f, 0.0f,
+    -0.5f, 0.25f, 0.0f
 };
-unsigned int indices[] = {
-    0, 1, 3,
-    1, 2, 3
+
+float vertices_2[] = {
+    // Second triangle
+    0.25f, -0.25f, 0.0f,
+    0.75f, -0.25f, 0.0f,
+    0.5f, 0.25f, 0.0f
 };
 
 // functions from other files
-void h3w_linkShaderProgram(unsigned int &shaderProgram);
+void h3w_linkShaderProgram(unsigned int &shaderProgram, bool yellow_shader);
 
 // callbacks
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -32,22 +40,6 @@ void processInput(GLFWwindow* window) {
     // 0 key exits the program
     if(glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
-    }
-
-    // Move the polygon's vertex around (yeah, I'm distracting myself from the actual graphics programming)
-    // X axis
-    if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        vertices[6] += 0.01f;
-    }
-    if(glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        vertices[6] -= 0.01f;
-    }
-    // Y axis
-    if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        vertices[7] += 0.01f;
-    }
-    if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        vertices[7] -= 0.01f;
     }
 }
 
@@ -78,29 +70,35 @@ int main() {
     //
     // "Hello Triangle" chapter - compile Vertex and Fragment shaders, link shader program
     //
-    unsigned int shaderProgram;
-    h3w_linkShaderProgram(shaderProgram);
+    unsigned int shaderProgram_w, shaderProgram_y;
+    h3w_linkShaderProgram(shaderProgram_w, false);
+    h3w_linkShaderProgram(shaderProgram_y, true);
 
-    // ditto - Vertex Array Object, Element Buffer Object, Vertex Buffer Object
-    unsigned int VAO, VBO, EBO;
+    // ditto - Vertex Array Object, Vertex Buffer Object
+    GLuint vao[2], vbo[2];
 
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    glGenVertexArrays(2, vao);
+    glGenBuffers(2, vbo);
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    // Triangle 1
+    glBindVertexArray(vao[0]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_1), vertices_1, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+    // specify how OpenGL should interpret the vertex buffer data [for every vbo!]
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    // specify how OpenGL should interpret the vertex buffer data
+    // Triangle 2
+    glBindVertexArray(vao[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_2), vertices_2, GL_STATIC_DRAW);
+
+    // specify how OpenGL should interpret the vertex buffer data [for every vbo!]
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // render (update?) loop
@@ -112,13 +110,14 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         
         // "Hello Triangle" rendering
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO);
-        // Update top vertice location
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-        // Draw polygon
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        // Draw triangle 1
+        glUseProgram(shaderProgram_w);
+        glBindVertexArray(vao[0]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        // Draw triangle 2
+        glUseProgram(shaderProgram_y);
+        glBindVertexArray(vao[1]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
         glfwPollEvents();
@@ -126,9 +125,11 @@ int main() {
     }
 
     // Clean exit
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteProgram(shaderProgram);
+    glDeleteVertexArrays(2, vao);
+    glDeleteBuffers(2, vbo);
+
+    glDeleteProgram(shaderProgram_w);
+    glDeleteProgram(shaderProgram_y);
     
     glfwTerminate();
     return 0;

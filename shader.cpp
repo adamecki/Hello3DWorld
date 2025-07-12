@@ -11,10 +11,16 @@ const char* vertexShaderSource = "#version 330 core\n"
     "}\0";
 
 // ditto - fragment shader source
-const char* fragmentShaderSource = "#version 330 core\n"
+const char* fragmentShaderSource_w = "#version 330 core\n"
     "out vec4 FragColor;\n"
     "void main() {\n"
-    "FragColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+    "   FragColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+    "}\0";
+
+const char* fragmentShaderSource_y = "#version 330 core\n"
+    "out vec4 FragColor;\n"
+    "void main() {\n"
+    "   FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);\n"
     "}\0";
 
 unsigned int vertexShader, fragmentShader;
@@ -36,9 +42,13 @@ void h3w_compileVertexShader() {
     }
 }
 
-void h3w_compileFragmentShader() {
+void h3w_compileFragmentShader(bool yellow_shader) {
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    if(yellow_shader) {
+        glShaderSource(fragmentShader, 1, &fragmentShaderSource_y, NULL);
+    } else {
+        glShaderSource(fragmentShader, 1, &fragmentShaderSource_w, NULL);
+    }
     glCompileShader(fragmentShader);
 
     // check if fragment shader compilation was successful
@@ -53,10 +63,10 @@ void h3w_compileFragmentShader() {
     }
 }
 
-void h3w_linkShaderProgram(unsigned int &shaderProgram) {
+void h3w_linkShaderProgram(unsigned int &shaderProgram, bool yellow_shader) {
     // compile Vertex and Fragment shaders
     h3w_compileVertexShader();
-    h3w_compileFragmentShader();
+    h3w_compileFragmentShader(yellow_shader);
 
     shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
