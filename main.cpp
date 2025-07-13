@@ -1,34 +1,35 @@
 #include <iostream>
+#include <math.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// [DONE] Objective 1: Draw 2 triangles next to each other using glDrawArrays by adding more vertices to your data.
-// [DONE] Objective 2: Create the same 2 triangles using two different VAOs and VBOs for their data.
-// [DONE] Objective 3: Create two shader programs where the second program uses a different fragment shader
-//              that outputs the color yellow; draw both triangles again where one outputs the color yellow.
+#include "shader.h"
 
 // window settings
 const unsigned int WINDOW_W = 1024;
 const unsigned int WINDOW_H = 768;
 
-// "Hello Triangle" chapter - triangle vertices
-float vertices_1[] = {
-    // First triangle
-    -0.75f, -0.25f, 0.0f,
-    -0.25f, -0.25f, 0.0f,
-    -0.5f, 0.25f, 0.0f
-};
+// [DONE] Objective: Adjust the vertex shader so that the triangle is upside down.
+// [DONE] Objective: Specify a horizontal offset via a uniform and move the triangle
+//              to the right side of the screen in the vertex shader using
+//              using this offset value.
+// [DONE] Objective: Output the vertex position to the fragment shader using the out
+//              keyword and set the fragment's color equal to this vertex
+//              position.
+// Question: Why is the bottom left (top left) side of the triangle black?
+// Answer:   That's probably happening because negative color values are treated as 0.
 
-float vertices_2[] = {
-    // Second triangle
-    0.25f, -0.25f, 0.0f,
-    0.75f, -0.25f, 0.0f,
-    0.5f, 0.25f, 0.0f
+// "Hello Triangle" chapter - triangle vertices
+float vertices_and_their_colors[] = {
+    // coordinates      // colors
+    -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom left:  red
+     0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right: green
+     0.0f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f  // top:          blue
 };
 
 // functions from other files
-void h3w_linkShaderProgram(unsigned int &shaderProgram, bool yellow_shader);
+void h3w_linkShaderProgram(unsigned int &shaderProgram);
 
 // callbacks
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -67,36 +68,24 @@ int main() {
         return -1;
     }
 
-    //
-    // "Hello Triangle" chapter - compile Vertex and Fragment shaders, link shader program
-    //
-    unsigned int shaderProgram_w, shaderProgram_y;
-    h3w_linkShaderProgram(shaderProgram_w, false);
-    h3w_linkShaderProgram(shaderProgram_y, true);
+    // "Shader" chapter - use the shader header file to process vertex and fragment shaders
+    h3w_shader ourShader("./shaders/shader.vert", "./shaders/shader.frag");
 
-    // ditto - Vertex Array Object, Vertex Buffer Object
-    GLuint vao[2], vbo[2];
+    unsigned int VAO, VBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
 
-    glGenVertexArrays(2, vao);
-    glGenBuffers(2, vbo);
+    // ditto - pass triangle vertex data to VBO
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_and_their_colors), vertices_and_their_colors, GL_STATIC_DRAW);
 
-    // Triangle 1
-    glBindVertexArray(vao[0]);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_1), vertices_1, GL_STATIC_DRAW);
-
-    // specify how OpenGL should interpret the vertex buffer data [for every vbo!]
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // ditto - specify how OpenGL should interpret the vertex buffer data: position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-
-    // Triangle 2
-    glBindVertexArray(vao[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_2), vertices_2, GL_STATIC_DRAW);
-
-    // specify how OpenGL should interpret the vertex buffer data [for every vbo!]
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -105,31 +94,27 @@ int main() {
     while(!glfwWindowShouldClose(window)) {
         processInput(window);
 
-        // clear screen
-        glClearColor(0.2f, 0.4f, 1.0f, 1.0f);
+        glClearColor(0.5f, 0.5f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        // Objective 2: moving offset
+        float timeValue = glfwGetTime();
+        float offsetValue = (sin(timeValue) / 10.0f) + 0.1f;
         
         // "Hello Triangle" rendering
-        // Draw triangle 1
-        glUseProgram(shaderProgram_w);
-        glBindVertexArray(vao[0]);
+        ourShader.use();
+        ourShader.setFloat("offset", offsetValue);
+        glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
-        // Draw triangle 2
-        glUseProgram(shaderProgram_y);
-        glBindVertexArray(vao[1]);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
 
-        glfwPollEvents();
         glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
     // Clean exit
-    glDeleteVertexArrays(2, vao);
-    glDeleteBuffers(2, vbo);
-
-    glDeleteProgram(shaderProgram_w);
-    glDeleteProgram(shaderProgram_y);
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    ourShader.clean_delete();
     
     glfwTerminate();
     return 0;
