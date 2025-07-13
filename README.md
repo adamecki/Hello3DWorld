@@ -18,9 +18,8 @@ You can download GLFW's source code to compile for your own platform [here](http
 ### Compiling
 G++:
 ```bash
-g++ -I include -L lib -g main.cpp glad.c shader.cpp -o main.out -l glfw3 -l GL -l X11 -l pthread -l Xrandr -l Xi -l dl
+g++ -I include -L lib -g main.cpp glad.c -o main.out -l glfw3 -l GL -l X11 -l pthread -l Xrandr -l Xi -l dl
 ```
 
 ### Other information
-At the moment the program renders a rectangle. You can control its bottom left vertex' X and Y position using the arrow keys. 0 key exits the program.
-
+At the moment the program renders a moving triangle. Hitting the '0' key exits the program.
