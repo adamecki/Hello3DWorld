@@ -4,28 +4,35 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "shader.h"
+#include <shader/shader.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 // window settings
 const unsigned int WINDOW_W = 1024;
 const unsigned int WINDOW_H = 768;
 
-// [DONE] Objective: Adjust the vertex shader so that the triangle is upside down.
-// [DONE] Objective: Specify a horizontal offset via a uniform and move the triangle
-//              to the right side of the screen in the vertex shader using
-//              using this offset value.
-// [DONE] Objective: Output the vertex position to the fragment shader using the out
-//              keyword and set the fragment's color equal to this vertex
-//              position.
-// Question: Why is the bottom left (top left) side of the triangle black?
-// Answer:   That's probably happening because negative color values are treated as 0.
+// Objective 1: Make sure only the happy face looks in the other/reverse direction by changing the fragment shader.
+// Objective 2: See if you can display 4 smiley faces on a single container image clamped at its edge.
+// Objective 3: Try to display only the center pixels of the texture image on the rectangle in such a way that
+//              the individual pixels are getting visible by changing the texture coordinates. Try to set the texture
+//              filtering method to GL_NEAREST to see the pixels more clearly.
+// Objective 4: Use a uniform variable as the mix function's third parameter to vary the amount the two textures
+//              are visible. Use the up and down arrow keys to change how much the container or the smiley face
+//              is visible.
 
-// "Hello Triangle" chapter - triangle vertices
-float vertices_and_their_colors[] = {
-    // coordinates      // colors
-    -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom left:  red
-     0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right: green
-     0.0f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f  // top:          blue
+float vertices_colors_txtcoords[] = {
+    // vertices         // colors           // texture coordinates
+     0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f,   1.0f, 1.0f,     // top right
+     0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,   1.0f, 0.0f,     // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f,   0.0f, 0.0f,     // bottom left
+    -0.5f,  0.5f, 0.0f, 1.0f, 1.0f, 0.0f,   0.0f, 1.0f      // top left
+};
+
+unsigned int indices[] = {
+    0, 1, 3,
+    3, 2, 1
 };
 
 // functions from other files
@@ -68,27 +75,77 @@ int main() {
         return -1;
     }
 
+    // "Textures" chapter - create OpenGL texture
+    unsigned int textures[2];
+    glGenTextures(2, textures);
+
+    for(unsigned int texture : textures) {
+        glBindTexture(GL_TEXTURE_2D, texture);
+        // set texture wrapping and filtering options
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+
+    // ditto - load image via stb_image library
+    stbi_set_flip_vertically_on_load(true);
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load("./textures/container.jpg", &width, &height, &nrChannels, 0);
+    if(data) {
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        std::cout << "E: failed to load texture" << std::endl;
+    }
+    data = stbi_load("./textures/awesomeface.png", &width, &height, &nrChannels, 0);
+    if(data) {
+        glBindTexture(GL_TEXTURE_2D, textures[1]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        std::cout << "E: failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
+
     // "Shader" chapter - use the shader header file to process vertex and fragment shaders
     h3w_shader ourShader("./shaders/shader.vert", "./shaders/shader.frag");
+    ourShader.use();
+    glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0);
+    glUniform1i(glGetUniformLocation(ourShader.ID, "texture2"), 1);
 
-    unsigned int VAO, VBO;
+    unsigned int VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
-    // ditto - pass triangle vertex data to VBO
+    // ditto - pass vertices data to VBO and indices data to EBO
     glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_and_their_colors), vertices_and_their_colors, GL_STATIC_DRAW);
 
-    // ditto - specify how OpenGL should interpret the vertex buffer data: position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textures[0]);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, textures[1]);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_colors_txtcoords), vertices_colors_txtcoords, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // specify how OpenGL should interpret the vertex buffer data
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     // render (update?) loop
     while(!glfwWindowShouldClose(window)) {
@@ -96,16 +153,12 @@ int main() {
 
         glClearColor(0.5f, 0.5f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
-        // Objective 2: moving offset
-        float timeValue = glfwGetTime();
-        float offsetValue = (sin(timeValue) / 10.0f) + 0.1f;
         
-        // "Hello Triangle" rendering
+        // rendering
         ourShader.use();
-        ourShader.setFloat("offset", offsetValue);
+        // "Textures" chapter - bind texture
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -114,6 +167,7 @@ int main() {
     // Clean exit
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
     ourShader.clean_delete();
     
     glfwTerminate();
